@@ -18,10 +18,7 @@ class Parser(object):
         self.env = Env()
 
 
-    def parse_arg(self, arg):              # think about best way to set up an ast
-        arg = arg.strip()                  # classes or nested dicts,
-                                           # which is faster? which is easier to manipulate?
-        arg_dict = {}
+    def parse_arg(self, arg):
         match = re.match(self.string, arg)
         if (match):
             return self.arg_tuple(arg_type='value', value=match.group(1))
@@ -54,10 +51,10 @@ class Parser(object):
                 i=j+1
             else:
                 yield self.parse_arg(arg_list[i])
-                i += 1;
+                i += 1
 
     def evaluate(self, func_name, args):
-        if (func_name not in self.env.builtins): # and (func_name not in self.env.user_defs):
+        if (func_name not in self.env.builtins):
             return 'Evaluator Error: Evaluator not defined.'
         func = self.env.builtins[func_name][0]
         arg_vals = [i.value for i in args]
