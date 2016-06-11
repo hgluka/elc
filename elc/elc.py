@@ -37,14 +37,14 @@ class Parser(object):
         if(func.arg_type != 'word'):
             return 'Syntax Error: Evaluators must start with words.'
         else:
-           return self.evaluate(func.value, [i for i in self.parse_args(eval[1::])]) # separate evaluation from parsing,
-                                                                         # or find another way to make function defs possible
+            return self.evaluate(func.value, [i for i in self.parse_args(eval[1::])]) # separate evaluation from parsing,
+                                                                                      # or find another way to make function defs possible
 
     def parse_args(self, arg_list):
         i=0
         while i in range(len(arg_list)):             # had to switch to while loop
             if '{' in arg_list[i]:                   # because an n-iteration skip is impossible in for loops
-                for j in range(len(arg_list)):       # unless done with iterators
+                for j in range(i, len(arg_list)):    # unless done with iterators
                     if '}' in arg_list[j]:           # which might be a better option
                         break
                 yield self.parse_eval(' '.join(arg_list[i:j+1]))
