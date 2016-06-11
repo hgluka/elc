@@ -44,14 +44,17 @@ class Parser(object):
                                                                          # or find another way to make function defs possible
 
     def parse_args(self, arg_list):
-        for i in range(len(arg_list)):
-            if '{' in arg_list[i]:
-                for j in range(len(arg_list)):
-                    if '}' in arg_list[j]:
+        i=0
+        while i in range(len(arg_list)):             # had to switch to while loop
+            if '{' in arg_list[i]:                   # because an n-iteration skip is impossible in for loops
+                for j in range(len(arg_list)):       # unless done with iterators
+                    if '}' in arg_list[j]:           # which might be a better option
                         break
-                yield self.parse_eval(' '.join(arg_list[i:j]))
+                yield self.parse_eval(' '.join(arg_list[i:j+1]))
+                i=j+1
             else:
                 yield self.parse_arg(arg_list[i])
+                i += 1;
 
     def evaluate(self, func_name, args):
         if (func_name not in self.env.builtins): # and (func_name not in self.env.user_defs):
