@@ -1,7 +1,5 @@
 #elc
-A programming language project with a core 
-in lambda calculus with some additions.
-(a WIP, so more coming soon)
+A programming language project WIP.
 
 #examples
 {+ 3 5}
