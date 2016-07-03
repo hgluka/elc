@@ -2,4 +2,6 @@
 A programming language project WIP.
 
 #examples
-{+ 3 5}
+{+ {+ 5 6} {+ 2 3}}
+
+{{fun add x {+ x 5}} {add 5}}
