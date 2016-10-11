@@ -2,6 +2,4 @@
 A programming language project WIP.
 
 #examples
-{+ {+ 5 6} {+ 2 3}}
-
-{{fun add x {+ x 5}} {add 5}}
+( fun f x -> ( + x 5 ) ) ; ( f 5)

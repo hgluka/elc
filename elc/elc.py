@@ -1,18 +1,6 @@
 #!/usr/bin/env python
-import regex
+import regex as re
 from collections import namedtuple as nt
-
-class Env(object):
-
-    def __init__(self):
-        self.builtins = {'+': lambda x,y: x+y,
-                         'fun': self.fun}
-
-        self.defined = {}
-
-
-    def fun(self):
-        pass # [TODO] lambda
 
 class Parser(object):
     '''
@@ -21,121 +9,107 @@ class Parser(object):
     '''
 
     def __init__(self):
-        self.string = r'^"([^"]*)"'
-        self.number = r'^\d+\b'
-        self.word = r'^[^\s{},"]+'
-        self.evaluator = r'^{.*}'
-        self.block_tuple = nt('block', 'evals')
-        self.fun_tuple = nt('fun', 'operator arguments')
-        self.arg_tuple = nt('arg', 'arg_type value')
+        self.token_table = {
+            re.compile('fun').search:'lambda',
+            re.compile('->').search:'lambda_dot',
+            re.compile('\(').search:'open_bracket',
+            re.compile('\)').search:'closed_bracket',
+            re.compile('\[').search:'open_sq_bracket',
+            re.compile('\]').search:'closed_sq_bracket',
+            re.compile('==').search:'equality',
+            re.compile('and').search:'and',
+            re.compile('or').search:'or',
+            re.compile(';').search:'expr_sep',
+            re.compile('^"([^"]*)"').search:'string',
+            re.compile('^\d+$').search:'integer'
+            }
+        self.token = nt('node', 't_type contents')
 
+        self.grammar_table = {
+            ('word',): 'expr',
+            ('string',): 'expr',
+            ('number',): 'expr',
+            ('func_decl',): 'expr',
+            ('func_appl',): 'expr',
+            ('bool',): 'expr',
+            ('open_bracket', 'expr', 'closed_bracket'): 'expr',
+            ('expr', 'expr_sep', 'expr'): 'expr',
 
-    def parse_arg(self, arg):
-        match = regex.match(self.string, arg)
-        if (match):
-            return self.arg_tuple(arg_type='value', value=match[0])
-        match = regex.match(self.number, arg)
-        if (match):
-            return self.arg_tuple(arg_type='value', value=int(match[0]))
-        match = regex.match(self.word, arg)
-        if (match):
-            return self.arg_tuple(arg_type='word', value=match[0])
+            ('lambda', 'func_name', 'arg_name', 'lambda_dot', 'expr'): 'func_decl',
+            ('expr', 'expr'): 'func_appl',
 
-    def parse_eval(self, stmt):
-        evaluator = regex.match(self.evaluator, stmt)
-        ev = evaluator[0][1::]
-        ev = ev.split()
-        func = self.parse_arg(ev[0])
-        if(func.arg_type != 'word'):
-            return 'Syntax Error: Evaluators must start with words.'
+            ('expr', 'equality', 'expr'): 'bool',
+            ('expr', 'or', 'expr'): 'bool',
+            ('expr', 'and', 'expr'): 'bool'
+        }
+
+    def tokenize(self, string): # still needs work, '(f x)' returns ['(f', 'x)'] instead of ['(', 'f', 'x', ')']
+        token_list = list()
+        for i in re.split('(\"[^\"]*\"| +)', string):
+            if not re.match('\s+', i) and i:
+                token_list.append(i)
+        print('debug token_list: ', token_list, '\n')
+        return token_list
+
+    def token_lookup(self, token):
+        for pattern in self.token_table:
+            if pattern(token):
+                if self.token_table[pattern] == 'string' or self.token_table[pattern] == 'integer':
+                    return self.token(self.token_table[pattern], token)
+                return self.token(self.token_table[pattern], None)
+        return self.token('word', token)
+
+    def lex(self, token_list):
+        lexd = [self.token_lookup(token) for token in token_list]
+        for i in range(1, len(lexd)):
+            if lexd[i].t_type == 'word' and lexd[i-1].t_type == 'lambda':
+                lexd[i] = self.token('func_name', lexd[i].contents)
+            if lexd[i].t_type == 'word' and (lexd[i-1].t_type == 'func_name' or lexd[i-1].t_type == 'arg_name'):
+                lexd[i] = self.token('arg_name', lexd[i].contents)
+        return lexd
+
+    def grammar_lookup(self, candidates):
+        for rule in self.grammar_table:
+            if rule == tuple([token.t_type for token in candidates]):
+                return [self.token(self.grammar_table[rule], candidates)]
         else:
-            return self.fun_tuple(operator=func, arguments=[i for i in self.parse_args(ev[1::])])
+            return candidates
 
-    def parse_args(self, arg_list):
-        i=0
-        while i in range(len(arg_list)):             # had to switch to while loop
-            if '{' in arg_list[i]:                   # because an n-iteration skip is impossible in for loops
-                for j in range(i, len(arg_list)):    # unless done with iterators
-                    if '}' in arg_list[j]:           # which might be a better option
-                        break                        # recursive regex or this?
-                yield self.parse_eval(' '.join(arg_list[i:j+1]))
+    def shift(self, parse_stack, lexd_input):
+        if lexd_input:
+            parse_stack.append(lexd_input.pop(0))
+            return True
+        else:
+            return False
 
-                i=j+1
+    def reduce(self, parse_stack):
+        i = len(parse_stack)-1
+        while i >= 0:
+            handle = parse_stack[i:]
+            parse_stack = parse_stack[:i] + self.grammar_lookup(handle)
+            i -= 1
+        return parse_stack
+
+    def bottom_up_parse(self, lexd_input):
+        parse_stack = list()
+        parsed = False
+        while not parsed:
+            if self.shift(parse_stack, lexd_input):
+                while parse_stack != self.reduce(parse_stack):
+                    parse_stack = self.reduce(parse_stack)
             else:
-                yield self.parse_arg(arg_list[i])
-                i += 1
+                parsed = parse_stack
+        return parsed
 
-    def parse_block(self, program):
-        eval_list = []
-        for match in regex.findall(r'{((?:[^{}]|(?R))*)}', program):
-            eval_list.append(self.parse_eval('{'+match+'}'))
-        return self.block_tuple(eval_list)
+    def parse(self, string):
+        return self.bottom_up_parse(self.lex(self.tokenize(string)))
 
-
-class Evaluator(object):
-    def __init__(self):
-        pass
-
-    def get_function_body(self, func, env):
-        try:
-            function = env.defined[func.operator]
-        except KeyError:
-            pass # flat is better than nested
-        try:
-            function = env.builtin[func.oprator]
-        except KeyError:
-            return 'Function ' + func.operator + 'not defined.'
-
-        return function
-
-    def evaluate(self, node, env):
-        if node.__class__.__name__ == 'block':
-            for e in node.evals:
-                return self.evaluate(e)
-        elif node.__class__.__name__ == 'fun':
-            arg_list = []
-            for arg in node.args:
-                arg_list.append(self.evaluate(arg))
-            if node.operator in env.defined:
-                # replace args in function body with evaluated arg_list, \
-                # then recurse over that function
-                env.defined[node.operator].args = arg_list
-                return evaluate(env.defined[node.operator])
-            elif node.operator in env.builtins:
-                return env.builtins[node.operator](zip(*arg_list))
-            else:
-                return 'Function not defined.'
-        elif node.__class__.__name__ == 'arg':
-            if node.arg_type == 'value':
-                return node.value
-            elif node.arg_type == 'word':
-                if node.value in env.defined:
-                    return env.defined[node.value]
-                elif node.value in env.builtin:
-                    return env.builtin[node.value]
-                else:
-                    return 'Arg not defined.'
-
-''' to be implemented separately
-def evaluate(self, func_name, args):
-    if (func_name not in self.env.builtins or func_name not in self.env.defined):
-        return 'Evaluator Error: Evaluator not defined.'
-    func = self.env.builtins[func_name]
-    arg_vals = [i.value for i in args]
-    try:
-        return self.parse_arg(str(func(*arg_vals)))
-    except TypeError:
-        return 'Evaluator Error: Wrong number of arguments given.'       # change error reporting system to be actually useful and easier to maintain
-    except AttributeError:
-        return 'Evaluator Error: Evaluator given wrong type of argument.'
-'''
-
-if __name__=='__main__':
-    print('elc v0.1')
+if __name__ == '__main__':
+    print('elc v0.12')
     print('-- -- --')
 
     parser = Parser()
 
     while True:
-        prog = input('> ')
-        print(parser.parse_block(prog))
+        line = input('> ')
+        print(parser.parse(line))
