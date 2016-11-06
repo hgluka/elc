@@ -4,8 +4,8 @@ from collections import namedtuple as nt
 
 class Parser(object):
     '''
-    Used to parse list of lines to an abstract syntax tree,
-    in the form of a nested named tuple
+    Used to parse string to a concrete syntax tree,
+    implemented as a nested named tuple.
     '''
 
     def __init__(self):
@@ -43,11 +43,10 @@ class Parser(object):
             ('expr', 'and', 'expr'): 'bool'
         }
 
-    def tokenize(self, string): # still needs work, '(f x)' returns ['(f', 'x)'] instead of ['(', 'f', 'x', ')']
+    def tokenize(self, string):
         token_list = list()
-        for i in re.split('(\"[^\"]*\"| +)', string):
-            if not re.match('\s+', i) and i:
-                token_list.append(i)
+        for i in re.findall('\"[^\"]*\"|[->]|[\_\+\-\.\,\!\?\:\=\@\#\$\%\^\&\*\(\)\;\\\/\|\<\>\']|[\w]+', string):
+            token_list.append(i)
         print('debug token_list: ', token_list, '\n')
         return token_list
 
@@ -103,6 +102,23 @@ class Parser(object):
 
     def parse(self, string):
         return self.bottom_up_parse(self.lex(self.tokenize(string)))
+
+class SemanticAnalyzer(object):
+    '''
+    Takes an input in the form of a cst (a tree of nested tuples)
+    converts it to ast.
+    '''
+
+    def __init__(self):
+        self.lambda_node = nt('lambda', 'func_name', 'arg_name', 'body')
+        self.apply_node = nt('apply', 'func_name', 'arg_name')
+
+    def convert_node(self, node):
+        if node.t_type == 'expr':
+            node = convert_node(node.contents)
+
+    def convert_tree(self, cst):
+        return convert_node(self, cst)
 
 if __name__ == '__main__':
     print('elc v0.12')
