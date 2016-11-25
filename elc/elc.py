@@ -12,6 +12,12 @@ class Parser(object):
         self.token_table = {
             re.compile('fun').search:'lambda',
             re.compile('->').search:'lambda_dot',
+            re.compile('\+').search:'add',
+            re.compile('-^>').search:'sub',
+            re.compile('\/').search:'div',
+            re.compile('\%').search:'mod',
+            re.compile('\*').search:'mul',
+            re.compile('\|').search:'head',
             re.compile('\(').search:'open_bracket',
             re.compile('\)').search:'closed_bracket',
             re.compile('\[').search:'open_sq_bracket',
@@ -26,17 +32,28 @@ class Parser(object):
         self.token = nt('node', 't_type contents')
 
         self.grammar_table = {
+            ('add',): 'binary_op',
+            ('sub',): 'binary_op',
+            ('div',): 'binary_op',
+            ('mod',): 'binary_op',
+            ('mul',): 'binary_op',
+            ('head',): 'binary_op',
+
             ('word',): 'expr',
             ('string',): 'expr',
-            ('number',): 'expr',
+            ('integer',): 'expr',
+            ('binary_operation',): 'expr',
             ('func_decl',): 'expr',
             ('func_appl',): 'expr',
             ('bool',): 'expr',
             ('open_bracket', 'expr', 'closed_bracket'): 'expr',
             ('expr', 'expr_sep', 'expr'): 'expr',
 
+            ('expr', 'binary_op', 'expr'): 'binary_operation',
+
             ('lambda', 'func_name', 'arg_name', 'lambda_dot', 'expr'): 'func_decl',
             ('expr', 'expr'): 'func_appl',
+
 
             ('expr', 'equality', 'expr'): 'bool',
             ('expr', 'or', 'expr'): 'bool',
@@ -45,15 +62,14 @@ class Parser(object):
 
     def tokenize(self, string):
         token_list = list()
-        for i in re.findall('\"[^\"]*\"|[->]|[\_\+\-\.\,\!\?\:\=\@\#\$\%\^\&\*\(\)\;\\\/\|\<\>\']|[\w]+', string):
+        for i in re.findall('\"[^\"]*\"|->|==|[\_\+\-\.\,\!\?\:\@\#\$\%\^\&\*\(\)\;\\\/\|\<\>\']|[\w]+', string):
             token_list.append(i)
-        print('debug token_list: ', token_list, '\n')
         return token_list
 
     def token_lookup(self, token):
         for pattern in self.token_table:
             if pattern(token):
-                if self.token_table[pattern] == 'string' or self.token_table[pattern] == 'integer':
+                if self.token_table[pattern] in ['string', 'integer', 'equality', 'and', 'or', 'add', 'sub', 'div', 'mod', 'mul', 'head']:
                     return self.token(self.token_table[pattern], token)
                 return self.token(self.token_table[pattern], None)
         return self.token('word', token)
@@ -65,6 +81,7 @@ class Parser(object):
                 lexd[i] = self.token('func_name', lexd[i].contents)
             if lexd[i].t_type == 'word' and (lexd[i-1].t_type == 'func_name' or lexd[i-1].t_type == 'arg_name'):
                 lexd[i] = self.token('arg_name', lexd[i].contents)
+            # add rule that makes conflicts with binary operations go away.
         return lexd
 
     def grammar_lookup(self, candidates):
@@ -110,22 +127,49 @@ class SemanticAnalyzer(object):
     '''
 
     def __init__(self):
-        self.lambda_node = nt('lambda', 'func_name', 'arg_name', 'body')
-        self.apply_node = nt('apply', 'func_name', 'arg_name')
+        self.lambda_node = nt('fun', 'func_name arg_name body')
+        def apply_node_c(func_name, arg_name):
+            apply_node_type = nt(func_name, 'arg_name')
+            return apply_node_type(arg_name)
+        self.apply_node = apply_node_c
+
+        def bool_node_c(lhs, rel, rhs):
+            bool_node_type = nt(rel, 'lhs rhs')
+            return bool_node_type(lhs, rhs)
+        self.bool_node = bool_node_c
+
+        def bin_op_node_c(lhs, op, rhs):
+            bin_op_node_type = nt(op, 'lhs rhs')
+            return bin_op_node_type(lhs, rhs)
+        self.bin_op_node = bin_op_node_c
 
     def convert_node(self, node):
-        if node.t_type == 'expr':
-            node = convert_node(node.contents)
+        if node.t_type == 'binary_operation':
+            return self.bin_op_node(self.convert_node(node.contents[0]), node.contents[1].contents[0].t_type+'_', self.convert_node(node.contents[2]))
+        elif node.t_type == 'func_decl':
+            return self.lambda_node(node.contents[1].contents, node.contents[2].contents, self.convert_node(node.contents[4]))
+        elif node.t_type == 'func_appl':
+            return self.apply_node(node.contents[0].contents[0].contents, self.convert_node(node.contents[1]))
+        elif node.t_type == 'bool':
+            return self.bool_node(self.convert_node(node.contents[0]), node.contents[1].contents+'_', self.convert_node(node.contents[2]))
+        elif node.t_type in ['word', 'integer', 'string']:
+            return node.contents
+        elif node.t_type == 'expr':
+            ret_node = tuple(self.convert_node(i) for i in node.contents if i.contents)
+            if len(ret_node)==1:
+                ret_node = ret_node[0]
+            return ret_node
 
     def convert_tree(self, cst):
-        return convert_node(self, cst)
+        return self.convert_node(cst[0])
 
 if __name__ == '__main__':
-    print('elc v0.12')
-    print('-- -- --')
+    print('elc v0.3')
+    print('by Luka Hadzi-Djokic\n')
 
     parser = Parser()
+    s_a = SemanticAnalyzer()
 
     while True:
         line = input('> ')
-        print(parser.parse(line))
+        print(s_a.convert_tree(parser.parse(line)))

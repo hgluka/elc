@@ -10,7 +10,7 @@ def test_tokenize():
 def test_lex():
     parser = Parser()
 
-    assert_equals(parser.lex(['(', 'x', ';', ')', '->', 'fun', 'or', 'and', '[', ']', '==', '"as df"', '123']), [parser.token(t_type='open_bracket', contents=None), parser.token(t_type='word', contents='x'), parser.token(t_type='expr_sep', contents=None), parser.token(t_type='closed_bracket', contents=None), parser.token(t_type='lambda_dot', contents=None), parser.token(t_type='lambda', contents=None), parser.token(t_type='or', contents=None), parser.token(t_type='and', contents=None), parser.token(t_type='open_sq_bracket', contents=None), parser.token(t_type='closed_sq_bracket', contents=None), parser.token(t_type='equality', contents=None), parser.token(t_type='string', contents='"as df"'), parser.token(t_type='integer', contents='123')])
+    assert_equals(parser.lex(['(', 'x', ';', ')', '->', 'fun', 'or', 'and', '[', ']', '==', '"as df"', '123']), [parser.token(t_type='open_bracket', contents=None), parser.token(t_type='word', contents='x'), parser.token(t_type='expr_sep', contents=None), parser.token(t_type='closed_bracket', contents=None), parser.token(t_type='lambda_dot', contents=None), parser.token(t_type='lambda', contents=None), parser.token(t_type='or', contents='or'), parser.token(t_type='and', contents='and'), parser.token(t_type='open_sq_bracket', contents=None), parser.token(t_type='closed_sq_bracket', contents=None), parser.token(t_type='equality', contents='=='), parser.token(t_type='string', contents='"as df"'), parser.token(t_type='integer', contents='123')])
 
 def test_parser():
     parser = Parser()
@@ -23,7 +23,7 @@ def test_parser():
 
     assert_equals(parser.parse('x'), [parser.token(t_type='expr', contents=[parser.token(t_type='word', contents='x')])])
 
-    assert_equals(parser.parse('x or y'), [parser.token(t_type='expr', contents=[parser.token(t_type='bool', contents=[parser.token(t_type='expr', contents=[parser.token(t_type='word', contents='x')]), parser.token(t_type='or', contents=None), parser.token(t_type='expr', contents=[parser.token(t_type='word', contents='y')])])])])
+    assert_equals(parser.parse('x or y'), [parser.token(t_type='expr', contents=[parser.token(t_type='bool', contents=[parser.token(t_type='expr', contents=[parser.token(t_type='word', contents='x')]), parser.token(t_type='or', contents='or'), parser.token(t_type='expr', contents=[parser.token(t_type='word', contents='y')])])])])
 
     assert_equals(parser.parse('x ; y'), [parser.token(t_type='expr', contents=[parser.token(t_type='expr', contents=[parser.token(t_type='word', contents='x')]), parser.token(t_type='expr_sep', contents=None), parser.token(t_type='expr', contents=[parser.token(t_type='word', contents='y')])])])
 
