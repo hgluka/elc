@@ -3,10 +3,10 @@ import regex as re
 from collections import namedtuple as nt
 
 class Parser(object):
-    '''
+    """
     Used to parse string to a concrete syntax tree,
     implemented as a nested named tuple.
-    '''
+    """
 
     def __init__(self):
         self.token_table = {
@@ -22,6 +22,7 @@ class Parser(object):
             re.compile('\)').search:'closed_bracket',
             re.compile('\[').search:'open_sq_bracket',
             re.compile('\]').search:'closed_sq_bracket',
+            re.compile('not').search:'not',
             re.compile('==').search:'equality',
             re.compile('and').search:'and',
             re.compile('or').search:'or',
@@ -55,6 +56,7 @@ class Parser(object):
             ('expr', 'expr'): 'func_appl',
 
 
+            ('not', 'expr'): 'bool',
             ('expr', 'equality', 'expr'): 'bool',
             ('expr', 'or', 'expr'): 'bool',
             ('expr', 'and', 'expr'): 'bool'
@@ -62,7 +64,7 @@ class Parser(object):
 
     def tokenize(self, string):
         token_list = list()
-        for i in re.findall('\"[^\"]*\"|->|==|[\_\+\-\.\,\!\?\:\@\#\$\%\^\&\*\(\)\;\\\/\|\<\>\']|[\w]+', string):
+        for i in re.findall('\"[^\"]*\"|->|==|[\_\+\-\.\,\!\?\:\@\#\$\%\^\[\]\&\*\(\)\;\\\/\|\<\>\']|[\w]+', string):
             token_list.append(i)
         return token_list
 
@@ -81,7 +83,6 @@ class Parser(object):
                 lexd[i] = self.token('func_name', lexd[i].contents)
             if lexd[i].t_type == 'word' and (lexd[i-1].t_type == 'func_name' or lexd[i-1].t_type == 'arg_name'):
                 lexd[i] = self.token('arg_name', lexd[i].contents)
-            # add rule that makes conflicts with binary operations go away.
         return lexd
 
     def grammar_lookup(self, candidates):
@@ -121,10 +122,10 @@ class Parser(object):
         return self.bottom_up_parse(self.lex(self.tokenize(string)))
 
 class SemanticAnalyzer(object):
-    '''
+    """
     Takes an input in the form of a cst (a tree of nested tuples)
     converts it to ast.
-    '''
+    """
 
     def __init__(self):
         self.lambda_node = nt('fun', 'func_name arg_name body')
@@ -151,7 +152,7 @@ class SemanticAnalyzer(object):
         elif node.t_type == 'func_appl':
             return self.apply_node(node.contents[0].contents[0].contents, self.convert_node(node.contents[1]))
         elif node.t_type == 'bool':
-            return self.bool_node(self.convert_node(node.contents[0]), node.contents[1].contents+'_', self.convert_node(node.contents[2]))
+            return self.bool_node(self.convert_node(node.contents[0]), node.contents[1].t_type+'_', self.convert_node(node.contents[2]))
         elif node.t_type in ['word', 'integer', 'string']:
             return node.contents
         elif node.t_type == 'expr':
@@ -160,7 +161,7 @@ class SemanticAnalyzer(object):
                 ret_node = ret_node[0]
             return ret_node
 
-    def convert_tree(self, cst):
+    def convert_to_ast(self, cst):
         return self.convert_node(cst[0])
 
 if __name__ == '__main__':
@@ -172,4 +173,4 @@ if __name__ == '__main__':
 
     while True:
         line = input('> ')
-        print(s_a.convert_tree(parser.parse(line)))
+        print(s_a.convert_to_ast(parser.parse(line)))
